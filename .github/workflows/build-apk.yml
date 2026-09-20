@@ -3,7 +3,6 @@ name: Build SM RO WATER SERVICE APK
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
 
 jobs:
   build:
@@ -17,8 +16,27 @@ jobs:
         run: |
           rm -rf build-src
           mkdir build-src
-          unzip -q SM-RO-WATER-SERVICE-GitHub-APK-Build.zip -d build-src
-          PROJECT_DIR=$(find build-src -name settings.gradle -o -name settings.gradle.kts | head -n 1 | xargs dirname)
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*v3*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: v3 ZIP file not found"
+            echo "Available ZIP files:"
+            find . -maxdepth 1 -type f -name "*.zip"
+            exit 1
+          fi
+
+          echo "Using ZIP: $ZIP_FILE"
+
+          unzip -q "$ZIP_FILE" -d build-src
+
+          PROJECT_DIR=$(find build-src -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project not found"
+            exit 1
+          fi
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
