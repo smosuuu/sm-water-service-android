@@ -1,0 +1,44 @@
+name: Build SM RO WATER SERVICE APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Android project
+        run: |
+          rm -rf build-src
+          mkdir build-src
+          unzip -q SM-RO-WATER-SERVICE-GitHub-APK-Build.zip -d build-src
+          PROJECT_DIR=$(find build-src -name settings.gradle -o -name settings.gradle.kts | head -n 1 | xargs dirname)
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SM-RO-WATER-SERVICE-debug
+          path: build-src/**/app/build/outputs/apk/debug/app-debug.apk
