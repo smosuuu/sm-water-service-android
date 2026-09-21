@@ -1,8 +1,10 @@
-name: Build SM RO WATER SERVICE APK
+name: Build SM RO WATER SERVICE Customer APK
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -12,30 +14,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract Android project
+      - name: Find customer project ZIP
+        shell: bash
         run: |
-          rm -rf build-src
-          mkdir build-src
+          set -e
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*v3*.zip" | head -n 1)
+          ZIP_FILE="$(find . -maxdepth 1 -type f \
+            -name 'SM-RO-WATER-SERVICE-CUSTOMER-*.zip' \
+            -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: v3 ZIP file not found"
-            echo "Available ZIP files:"
-            find . -maxdepth 1 -type f -name "*.zip"
+            echo "ERROR: Customer project ZIP not found."
+            echo "ZIP files in repository:"
+            find . -maxdepth 1 -type f -name "*.zip" -print
             exit 1
           fi
 
-          echo "Using ZIP: $ZIP_FILE"
+          echo "Using:"
+          echo "$ZIP_FILE"
+
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+
+      - name: Extract customer Android project
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf build-src
+          mkdir -p build-src
 
           unzip -q "$ZIP_FILE" -d build-src
 
-          PROJECT_DIR=$(find build-src -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
+          PROJECT_DIR="$(find build-src -type f \
+            -name 'settings.gradle' -print -quit | xargs dirname)"
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project not found"
+            echo "ERROR: Android project not found."
+            find build-src -maxdepth 4 -type f | head -100
             exit 1
           fi
+
+          echo "Android project:"
+          echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
@@ -43,20 +63,42 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: "8.11"
 
-      - name: Build Debug APK
+      - name: Build customer APK
+        shell: bash
         run: |
+          set -e
+
           cd "$PROJECT_DIR"
-          gradle --no-daemon assembleDebug
+
+          echo "Building SM RO WATER SERVICE Customer APK..."
+
+          gradle --no-daemon clean assembleDebug
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+
+          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          echo "APK successfully generated:"
+          ls -lh "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SM-RO-WATER-SERVICE-debug
+          name: SM-RO-WATER-SERVICE-CUSTOMER-FIXED
           path: build-src/**/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
